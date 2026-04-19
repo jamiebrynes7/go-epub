@@ -69,6 +69,12 @@ type pkgIdentifier struct {
 	Data string `xml:",chardata"`
 }
 
+// <dc:subject>, one per EPUB subject/tag
+type pkgSubject struct {
+	XMLName xml.Name `xml:"dc:subject"`
+	Data    string   `xml:",chardata"`
+}
+
 // <item> elements, one per each file stored in the EPUB
 // Ex: <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav" />
 //
@@ -111,6 +117,7 @@ type pkgMetadata struct {
 	// Ex: <dc:language>en</dc:language>
 	Language    string `xml:"dc:language"`
 	Description string `xml:"dc:description,omitempty"`
+	Subjects    []pkgSubject
 	Creator     *pkgCreator
 	Meta        []pkgMeta `xml:"meta"`
 }
@@ -198,6 +205,21 @@ func (p *pkg) setLang(lang string) {
 
 func (p *pkg) setDescription(desc string) {
 	p.xml.Metadata.Description = desc
+}
+
+func (p *pkg) setSubjects(subjects []string) {
+	filtered := make([]pkgSubject, 0, len(subjects))
+	for _, s := range subjects {
+		if s == "" {
+			continue
+		}
+		filtered = append(filtered, pkgSubject{Data: s})
+	}
+	if len(filtered) == 0 {
+		p.xml.Metadata.Subjects = nil
+		return
+	}
+	p.xml.Metadata.Subjects = filtered
 }
 
 func (p *pkg) setPpd(direction string) {

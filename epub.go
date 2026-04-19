@@ -138,6 +138,8 @@ type Epub struct {
 	lang string
 	// Description
 	desc string
+	// Subjects
+	subjects []string
 	// Page progression direction
 	ppd string
 	// The package file (package.opf)
@@ -417,6 +419,15 @@ func (e *Epub) Description() string {
 	return e.desc
 }
 
+// Subjects returns the subjects of the EPUB.
+func (e *Epub) Subjects() []string {
+	e.Lock()
+	defer e.Unlock()
+	out := make([]string, len(e.subjects))
+	copy(out, e.subjects)
+	return out
+}
+
 // Ppd returns the page progression direction of the EPUB.
 func (e *Epub) Ppd() string {
 	return e.ppd
@@ -535,6 +546,22 @@ func (e *Epub) SetDescription(desc string) {
 	defer e.Unlock()
 	e.desc = desc
 	e.pkg.setDescription(desc)
+}
+
+// SetSubjects replaces the subjects (tags) of the EPUB. Each non-empty entry is
+// emitted as a <dc:subject> element inside <metadata>. Passing nil or an empty
+// slice clears the subjects.
+func (e *Epub) SetSubjects(subjects []string) {
+	e.Lock()
+	defer e.Unlock()
+	stored := make([]string, 0, len(subjects))
+	for _, s := range subjects {
+		if s != "" {
+			stored = append(stored, s)
+		}
+	}
+	e.subjects = stored
+	e.pkg.setSubjects(subjects)
 }
 
 // SetPpd sets the page progression direction of the EPUB.

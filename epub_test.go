@@ -1480,3 +1480,118 @@ func TestAddSubSectionWithCustomFilename(t *testing.T) {
 
 	cleanup(testEpubFilename, tempDir)
 }
+
+func TestEpubSubjects(t *testing.T) {
+	cases := []struct {
+		name    string
+		input   []string
+		want    []string
+		notWant []string
+	}{
+		{
+			name:  "basic",
+			input: []string{"Fiction", "Sci-Fi"},
+			want: []string{
+				"<dc:subject>Fiction</dc:subject>",
+				"<dc:subject>Sci-Fi</dc:subject>",
+			},
+		},
+		{
+			name:    "nil",
+			input:   nil,
+			notWant: []string{"<dc:subject>"},
+		},
+		{
+			name:    "empty",
+			input:   []string{},
+			notWant: []string{"<dc:subject>"},
+		},
+		{
+			name:  "filters empty entries",
+			input: []string{"A", "", "B"},
+			want: []string{
+				"<dc:subject>A</dc:subject>",
+				"<dc:subject>B</dc:subject>",
+			},
+			notWant: []string{"<dc:subject></dc:subject>"},
+		},
+		{
+			name:  "xml-escaped",
+			input: []string{"A & B <c>"},
+			want:  []string{"<dc:subject>A &amp; B &lt;c&gt;</dc:subject>"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e, err := NewEpub(testEpubTitle)
+			if err != nil {
+				t.Fatal(err)
+			}
+			e.SetSubjects(tc.input)
+
+			tempDir := writeAndExtractEpub(t, e, testEpubFilename)
+			contents, err := storage.ReadFile(filesystem, filepath.Join(tempDir, contentFolderName, pkgFilename))
+			if err != nil {
+				t.Fatalf("Unexpected error reading package file: %s", err)
+			}
+
+			got := string(contents)
+			for _, want := range tc.want {
+				if !strings.Contains(got, want) {
+					t.Errorf("missing %q in:\n%s", want, got)
+				}
+			}
+			for _, notWant := range tc.notWant {
+				if strings.Contains(got, notWant) {
+					t.Errorf("unexpected %q in:\n%s", notWant, got)
+				}
+			}
+
+			cleanup(testEpubFilename, tempDir)
+		})
+	}
+}
+
+func TestEpubSubjectsReplace(t *testing.T) {
+	e, err := NewEpub(testEpubTitle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.SetSubjects([]string{"First"})
+	e.SetSubjects([]string{"Second"})
+
+	tempDir := writeAndExtractEpub(t, e, testEpubFilename)
+	contents, err := storage.ReadFile(filesystem, filepath.Join(tempDir, contentFolderName, pkgFilename))
+	if err != nil {
+		t.Fatalf("Unexpected error reading package file: %s", err)
+	}
+
+	got := string(contents)
+	if strings.Contains(got, "<dc:subject>First</dc:subject>") {
+		t.Errorf("first call not replaced:\n%s", got)
+	}
+	if !strings.Contains(got, "<dc:subject>Second</dc:subject>") {
+		t.Errorf("second call missing:\n%s", got)
+	}
+
+	cleanup(testEpubFilename, tempDir)
+}
+
+func TestEpubSubjectsGetter(t *testing.T) {
+	e, err := NewEpub(testEpubTitle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.SetSubjects([]string{"A", "B"})
+
+	got := e.Subjects()
+	if len(got) != 2 || got[0] != "A" || got[1] != "B" {
+		t.Errorf("Subjects() = %v, want [A B]", got)
+	}
+
+	got[0] = "mutated"
+	if e.Subjects()[0] != "A" {
+		t.Error("Subjects() returned internal slice; mutation leaked")
+	}
+}
